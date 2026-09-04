@@ -349,7 +349,7 @@ Cons, ranked:
 1. **Churn.** A second transform system next to the existing one. Vite internals ship both shapes for years, plugin authors migrate, docs split across two modes.
 2. **Learning curve.** People that are not familiar with this requires to learn the new transform pipline. Need to know that it's a standalone pipeline.
 3. **Author-side duplication.** A plugin that ships only `transformer` breaks on older Vite, so authors carry both hooks side by side for a long time.
-4. **Merge rules are unproven.** How user entries fold onto plugin presets (matching, precedence, the exact `'...'` splice) is the part still marked "not a final design".
+4. **Merge rules are unproven.** Merge rules should be explicitly documented. This is something that might confuse people when implementing your custom transformer pipeline and interacting with the plugin transformer presets.
 
 ### Plugin array model
 

@@ -86,7 +86,7 @@ transformer: [
 
 Reading one line tells you the full story for one scope: which files, which steps, in which order, delivered how. The table is static data, so tools (devtools, docs) can analyze it without running anything.
 
-Users do not write this table for common cases. Plugins ship it as a preset (`plugins: [svgo(), svgr()]` keeps working). The top-level `transformer` config in `vite.config` exists for the custom cases: it extends or overrides the plugins' presets.
+Users do not write this table for common cases. Plugins ship it as a preset (`plugins: [svgo(), svgr()]` keeps working). The top-level `transformer` config in `vite.config` / `rolldown.config` exists for the custom cases: it extends or overrides the plugins' presets.
 
 The full SVG example. First, the updated plugins export their pure steps:
 

@@ -349,7 +349,7 @@ Cons, ranked:
 
 1. **Churn.** A second transform system next to the existing one. Vite internals ship both shapes for years, plugin authors migrate, docs split across two modes.
 2. **Learning curve.** People that are not familiar with this requires to learn the new transform pipline. Need to know that it's a standalone pipeline.
-3. **Author-side duplication.** A plugin that ships only `transformer` breaks on older Vite, so authors carry both hooks side by side for a long time.
+3. **Author-side duplication.** A plugin that ships only `transformer` breaks on older Vite, but we can create a helper function that converts `transformer` presets into `transform` hook handler. so authors carry both hooks side by side for a long time.
 4. **Merge rules are unproven.** Merge rules should be explicitly documented. This is something that might confuse people when implementing your custom transformer pipeline and interacting with the plugin transformer presets.
 
 ### Plugin array model
@@ -393,7 +393,7 @@ Points established in the design discussion:
 
 - **`moduleType` + `representType` solve the "too narrow / too broad filter" problems on their own.** Both models include them. The remaining disagreement is only about where order and scope control live.
 - **Duplication happens in both models.** Variant-dependent order (`?raw-replace` vs `?react-replace-raw`) needs the same step listed twice either way. So duplication is not a point for either side; the question is where the duplicate is easier to write and read.
-- **Filters need to be placed out of the transform handler.** Both models require user to put filter logic out of the transform handler. This should be migrated in both models. Otherwise, the filter inside might narrow down the scope of module transform.
+- **Filters need to be placed out of the transform handler.** Both models require user to put filter logic out of the transform handler. Specially for array plugin model, the plugin should take `include` / `exclude` option, which is a convention in Rollup. This should be migrated in both models. Otherwise, the filter inside might narrow down the scope of module transform.
 - **The declared model's duplication is scoped and local**: one config line per variant, readable as "this scope runs these steps". It effectively creates multiple scoped pipelines. But this only works because filters and `shortcut` moved out of the plugins. Inside plugins, `rawPlugin → replacePlugin` cannot work, because rawPlugin bails out eagerly. If we move filter and shortcut out of plugins anyway, that is already most of the refactor, which is an argument for going all the way to the declared model.
 - **The plugin array model's duplication is positional**: insert wrapper plugins at the right array positions. It reuses everything the ecosystem already knows, but tuning order and scope by array position and filters is expected to be a common source of user confusion.
 - **Static analysis.** The declared table is data; devtools can show the exact pipeline per scope without executing plugins. The plugin array's effective pipeline is only known by evaluating filters and `shortcut` results.

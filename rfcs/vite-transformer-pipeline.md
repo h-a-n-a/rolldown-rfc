@@ -2,13 +2,13 @@
 
 Status: draft, for #stack discussion.
 
-This document proposes the **declared composition model**: declare per-scope transform pipelines in config, outside of plugin hooks. It also includes, in full, the alternative **plugin array model** (sapphi-red): keep the current `transform` hook chain and add a few small primitives (`representType`, `shortcut`, `withFilter`, moduleType filters) so the chain can express the same things. The two are compared at the end so we can decide which way to go.
+This document proposes the **declared composition model**: declare per-scope transform pipelines in config, outside of plugin hooks. It also includes, in full, the alternative **plugin array model** (sapphi-red): keep the current `transform` hook chain and add a few small primitives (`representType`, `shortcut`, moduleType filters) so the chain can express the same things. The two are compared at the end so we can decide which way to go.
 
 ## Summary
 
 Today, every code change in Vite goes through the `transform` hook chain. Each plugin ships its own filter, and the order of work is the order of the plugin array. This works, but two things are hard:
 
-1. **Scoping.** A plugin author writes one filter for all possible uses of the plugin. When a user needs a new variant (a new query, a new combination), the author's filter is either too narrow (misses the variant) or too broad (catches things it should not touch).
+1. **Scoping.** A plugin author writes one filter for all possible uses of the plugin. When a user needs a new variant (a new query, a new combination), the author's filter misses it, and the author had no way to know it would exist.
 2. **Representation.** "How the module is delivered" (raw text, url, data url, JS) is mixed into transform logic, instead of being a separate, declarable fact.
 
 The proposal builds on two Rolldown proposals by sapphi-red:
@@ -55,11 +55,12 @@ The wanted pipeline for each variant:
 
 With today's `transform` hooks:
 
-- The svgo plugin author must guess a filter like `/\.svg(\?(url|inline|react))?$/`. This couples svgo to Vite's `?url` and svgr's `?react`. And it still misses the user's `?raw-optimized`.
-- To support `?raw-optimized`, the user must write a new plugin and copy svgo's transform body into it.
-- To keep `?raw` untouched, every plugin must add an `exclude`, or an early-bailout signal must exist, which is not supported and the raw handling must run before all user plugins.
+- The svgo plugin author follows the Vite convention: match any query except `?raw`, so the filter is `/\.svg(\?(?!raw)\w+)?$/`. This keeps `?raw` untouched without naming `?url` or `?react`.
+- The same filter misses the user's `?raw-optimized`. The query starts with `raw`, so the `(?!raw)` check rejects it, and `\w+` does not match the `-`. The author cannot know a query the user invented.
+- To support `?raw-optimized`, the user must write a new plugin and copy svgo's transform body into it, or re-scope svgo with `withFilter` and keep the two filters in sync by hand.
+- The convention is itself a coupling: every plugin must know about `?raw`, and about any future "deliver as-is" query. It holds only if every author follows it.
 
-So the filter is always either too narrow (misses `?raw-optimized`) or too broad (catches `?raw`).
+So a filter written once by the author cannot fit every use: it is exact for the variants the author knew about, and misses the ones the user adds.
 
 ### A second requirement: order depends on the variant
 
@@ -255,7 +256,7 @@ Keep the `transform` hook and the plugin array as the one ordering mechanism. Ad
 
 - **representType**: declared inside the plugin, in the transform result (e.g. `return { representType: 'text', shortcut: true }`).
 - **`shortcut: true`**: an early-bailout signal in a transform result: "the pipeline ends here, later transforms do not run on this module."
-- **`withFilter(plugin, filter)`**: a user-side wrapper that rewrites a plugin's filters from outside.
+- **`withFilter(plugin, filter)`**: a user-side wrapper that rewrites a plugin's filters from outside, which has been implemented [here](https://rolldown.rs/reference/Function.withFilter#function-withfilter).
 - **moduleType filters**: `filter: { moduleType: 'svg' }` matches by module type, not only by id. Rolldown gains an option to map extensions to module types (like it already has for cases such as `.vert`).
 
 The full SVG example in this model. The user writes two small helper plugins and places everything in the right order:
@@ -329,7 +330,7 @@ Semantics of the alternative, in detail:
 	- Wraps an existing plugin and replaces the filter of a named hook from the outside: `withFilter(replace(), { transform: { id: /\?raw-replace/ } })`. This is the user-side answer to "the author's filter does not fit my variant". 
 	- Plugin author needs to make sure that each `transform` hook handlers do not contain any filtering logic, otherwise it will make `transform.filter` not working as expected.
 - **Ordering.** The plugin array is the only order. Variant-dependent orders are expressed by inserting the same plugin (or a small wrapper like `extendedRaw`) more than once with different filters. `shortcut` plugins act as scope boundaries inside the array.
-- **Cost note.** Each plugin in the array is a separate hook call. When transforms run in Rust (Rolldown) and plugins are JS, every extra plugin is another Rust → JS → Rust round trip for the modules it matches. The declared model groups a scope's steps into one declared pipeline, which gives the native side the whole plan up front.
+- **Cost note.** Each plugin in the array is a separate hook call. When transforms run in Rust (Rolldown) and plugins are JS, every extra plugin is another Rust → JS → Rust round trip for the modules it matches, but the optimization should be possible as long as most plugins write the hook filter. The declared model groups a scope's steps into one declared pipeline, which gives the native side the whole plan up front.
 
 ## Pros and cons
 
